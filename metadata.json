@@ -1,0 +1,6 @@
+{
+  "name": "Smart Study Buddy",
+  "description": "An offline academic study assistant for engineering students, providing unit digests, critical exam topics, practice quizzes, classroom NLP notes summarization, and local progress analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
