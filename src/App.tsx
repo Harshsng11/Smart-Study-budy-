@@ -16,6 +16,7 @@ import SyllabusHub from './components/SyllabusHub';
 import VivaArena from './components/VivaArena';
 import SmartNotes from './components/SmartNotes';
 import StudyPlanner from './components/StudyPlanner';
+import StudentAuth, { StudentAccount } from './components/StudentAuth';
 
 type ViewID = 'dashboard' | 'syllabus' | 'viva' | 'notes' | 'planner';
 
@@ -23,24 +24,29 @@ export default function App() {
   const [activeView, setActiveView] = useState<ViewID>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
-  // Initialize offline progress from client storage safely.
-  const [userProgress, setUserProgress] = useState<UserProgress>(() => {
-    const saved = localStorage.getItem('smart_study_buddy_progress_v1');
-    if (saved) {
+  // Initialize current student session safely
+  const [currentStudent, setCurrentStudent] = useState<StudentAccount | null>(() => {
+    const savedActive = localStorage.getItem('smart_study_buddy_active_student_v1');
+    if (savedActive) {
       try {
-        const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === 'object') {
-          return {
-            completedQuizIds: parsed.completedQuizIds || {},
-            masteredVivaIds: parsed.masteredVivaIds || [],
-            completedTopicIds: parsed.completedTopicIds || [],
-            customNotes: parsed.customNotes || [],
-            studyPlanner: parsed.studyPlanner || null
-          };
-        }
+        return JSON.parse(savedActive);
       } catch (err) {
-        console.warn('Failed to parse local stored progress, recovering default state.', err);
+        console.warn('Stale student session removed.');
       }
+    }
+    return null;
+  });
+
+  // Active student progress selector
+  const [userProgress, setUserProgress] = useState<UserProgress>(() => {
+    const savedActive = localStorage.getItem('smart_study_buddy_active_student_v1');
+    if (savedActive) {
+      try {
+        const parsedStudent = JSON.parse(savedActive);
+        if (parsedStudent && parsedStudent.progress) {
+          return parsedStudent.progress;
+        }
+      } catch (err) {}
     }
     return {
       completedQuizIds: {},
@@ -51,10 +57,45 @@ export default function App() {
     };
   });
 
-  // Client Storage Sync
+  // Sync active student session with master list and localstorage
+  const handleSignIn = (student: StudentAccount) => {
+    setCurrentStudent(student);
+    setUserProgress(student.progress);
+    localStorage.setItem('smart_study_buddy_active_student_v1', JSON.stringify(student));
+  };
+
+  const handleSignOut = () => {
+    setCurrentStudent(null);
+    localStorage.removeItem('smart_study_buddy_active_student_v1');
+  };
+
+  // Sync progress edits to student profile card & database list
   const handleUpdateProgress = (updated: UserProgress) => {
     setUserProgress(updated);
-    localStorage.setItem('smart_study_buddy_progress_v1', JSON.stringify(updated));
+    if (!currentStudent) return;
+
+    const updatedStudent = { ...currentStudent, progress: updated };
+    setCurrentStudent(updatedStudent);
+    localStorage.setItem('smart_study_buddy_active_student_v1', JSON.stringify(updatedStudent));
+
+    // Also update the database master list of offline profiles
+    const savedAccounts = localStorage.getItem('smart_study_buddy_accounts_v1');
+    if (savedAccounts) {
+      try {
+        const parsedList = JSON.parse(savedAccounts);
+        if (Array.isArray(parsedList)) {
+          const updatedList = parsedList.map((acc: StudentAccount) => {
+            if (acc.id === currentStudent.id) {
+              return { ...acc, progress: updated };
+            }
+            return acc;
+          });
+          localStorage.setItem('smart_study_buddy_accounts_v1', JSON.stringify(updatedList));
+        }
+      } catch (err) {
+        console.error('Failed to update profiles master index', err);
+      }
+    }
   };
 
   // Compute overall progress metrics across 5 subjects * (5 units + 3 topics + 3 vivas) = 55 total items
@@ -77,6 +118,14 @@ export default function App() {
 
   return (
     <div id="app-workspace-container" className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row font-sans relative overflow-x-hidden">
+      
+      {/* Standalone Student Gate: block window contents or provision new high-tech ID */}
+      <StudentAuth 
+        currentStudent={currentStudent}
+        onSignIn={handleSignIn}
+        onSignOut={handleSignOut}
+        onUpdateAccountProgress={handleUpdateProgress}
+      />
       
       {/* Immersive Atmospheric Ambient Blur Glows */}
       <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-cyan-600/10 rounded-full blur-[120px] pointer-events-none z-0"></div>
@@ -127,16 +176,12 @@ export default function App() {
           </div>
 
           {/* User Profile Mini-Identity card */}
-          <div id="avatar-identity-widget" className="bg-white/[0.03] border border-white/10 p-4 rounded-xl flex items-center gap-3">
-            <div className="p-2 rounded-full bg-slate-800 text-cyan-400 shrink-0 border border-white/5">
-              <User className="w-4 h-4" />
-            </div>
-            <div className="min-w-0">
-              <span className="text-[9px] font-mono text-slate-500 block uppercase tracking-wide">STUDENT IDENTITY</span>
-              <strong className="text-slate-200 text-xs truncate block font-sans">IT-2 Programme</strong>
-              <span className="text-[10px] text-cyan-400/90 font-mono block leading-none mt-0.5">ID: ENG-4882-X</span>
-            </div>
-          </div>
+          <StudentAuth 
+            currentStudent={currentStudent}
+            onSignIn={handleSignIn}
+            onSignOut={handleSignOut}
+            onUpdateAccountProgress={handleUpdateProgress}
+          />
 
           {/* Main Action Triggers Grid */}
           <nav id="sidebar-action-navigation" className="space-y-2">
