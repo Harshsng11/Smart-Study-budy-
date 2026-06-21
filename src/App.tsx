@@ -120,12 +120,14 @@ export default function App() {
     <div id="app-workspace-container" className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row font-sans relative overflow-x-hidden">
       
       {/* Standalone Student Gate: block window contents or provision new high-tech ID */}
-      <StudentAuth 
-        currentStudent={currentStudent}
-        onSignIn={handleSignIn}
-        onSignOut={handleSignOut}
-        onUpdateAccountProgress={handleUpdateProgress}
-      />
+      {!currentStudent && (
+        <StudentAuth 
+          currentStudent={currentStudent}
+          onSignIn={handleSignIn}
+          onSignOut={handleSignOut}
+          onUpdateAccountProgress={handleUpdateProgress}
+        />
+      )}
       
       {/* Immersive Atmospheric Ambient Blur Glows */}
       <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-cyan-600/10 rounded-full blur-[120px] pointer-events-none z-0"></div>
